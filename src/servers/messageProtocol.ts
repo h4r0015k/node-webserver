@@ -1,4 +1,5 @@
 import * as net from "net";
+import { DynBuff, cutMessage, bufPush } from "../utils/buffer";
 
 // initialize socket
 const soInit = (socket: net.Socket) => {
@@ -72,20 +73,28 @@ const soWrite = async (Conn: TCPConn, data: Buffer): Promise<void> => {
 
 const serveClient = async (Conn: TCPConn) => {
   try {
+    // dynamic buffer
+    const buff = { data: Buffer.alloc(0), length: 0 } as DynBuff;
+
     while (true) {
-      let data = await soRead(Conn);
-      console.log(data?.toString());
+      let message = cutMessage(buff);
+      if (!message) {
+        let data = await soRead(Conn);
 
-      if (data.length == 1) {
-        console.log("end connection");
-        break;
+        if (data.length == 0) {
+          return;
+        }
+        bufPush(buff, data);
+
+        continue;
       }
-
-      await soWrite(Conn, data);
+      if (message.equals(Buffer.from("quit\n"))) {
+        await soWrite(Conn, Buffer.from("GoodBye\n"));
+        Conn.socket.destroy();
+      } else {
+        await soWrite(Conn, Buffer.concat([Buffer.from("Echo: "), message]));
+      }
     }
-
-    await soWrite(Conn, Buffer.from("GoodBye\n"));
-    Conn.socket.end();
   } catch (err) {
     console.log(err);
   }
