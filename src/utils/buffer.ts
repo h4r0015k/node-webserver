@@ -17,14 +17,21 @@ const bufPush = (buf: DynBuff, data: Buffer): void => {
 };
 
 const cutMessage = (buf: DynBuff): Buffer | null => {
-  const index = buf.data.subarray(0, buf.length).indexOf("\n");
+  const index = buf.data.subarray(0, buf.length).indexOf("\n", buf.start);
 
   if (index < 0) {
     return null;
   }
 
-  const msg = Buffer.from(buf.data.subarray(0, index + 1));
-  bufPop(buf, index + 1);
+  const msg = Buffer.from(buf.data.subarray(buf.start, index + 1));
+  buf.start = index + 1;
+
+  // only push forward when wasted space reaches thresold size
+  if (buf.start >= 32 && buf.start >= buf.length / 2) {
+    bufPop(buf, buf.start);
+    buf.start = 0;
+  }
+
   return msg;
 };
 
@@ -36,6 +43,7 @@ const bufPop = (buf: DynBuff, len: number) => {
 type DynBuff = {
   data: Buffer;
   length: number;
+  start: number;
 };
 
 export { bufPush, DynBuff, bufPop, cutMessage };

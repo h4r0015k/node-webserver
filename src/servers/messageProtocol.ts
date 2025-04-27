@@ -74,7 +74,7 @@ const soWrite = async (Conn: TCPConn, data: Buffer): Promise<void> => {
 const serveClient = async (Conn: TCPConn) => {
   try {
     // dynamic buffer
-    const buff = { data: Buffer.alloc(0), length: 0 } as DynBuff;
+    const buff = { data: Buffer.alloc(0), length: 0, start: 0 } as DynBuff;
 
     while (true) {
       let message = cutMessage(buff);
