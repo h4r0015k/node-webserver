@@ -1,6 +1,8 @@
 import * as net from "net";
-import { TCPConn, TCPListener } from "../utils/types";
-import { soRead, soWrite } from "../utils/socket";
+import { DynBuff, bufPush, cutMessageV2 } from "../utils/buffer";
+import { HTTPRes, TCPConn, TCPListener } from "../utils/types";
+import { soRead } from "../utils/socket";
+import { handleReq, readFromReq, writeHTTPResp } from "../utils/http";
 
 // initialize socket
 const soInit = (socket: net.Socket) => {
@@ -41,20 +43,34 @@ const soInit = (socket: net.Socket) => {
 
 const serveClient = async (Conn: TCPConn) => {
   try {
-    while (true) {
-      let data = await soRead(Conn);
-      console.log(data?.toString());
+    // dynamic buffer
+    const buff = { data: Buffer.alloc(0), length: 0, start: 0 } as DynBuff;
 
-      if (data.length == 0) {
-        console.log("end connection");
-        break;
+    while (true) {
+      let message = cutMessageV2(buff);
+      if (!message) {
+        let data = await soRead(Conn);
+
+        if (data.length == 0) {
+          return;
+        }
+
+        bufPush(buff, data);
+
+        if (!(data.length && buff.length)) {
+          return;
+        }
+
+        continue;
       }
 
-      await soWrite(Conn, data);
-    }
+      const reqBody = readFromReq(Conn, buff, message);
+      const res: HTTPRes = await handleReq(message, reqBody);
+      await writeHTTPResp(Conn, res);
 
-    await soWrite(Conn, Buffer.from("GoodBye\n"));
-    Conn.socket.end();
+      // consume req body completly
+      while ((await reqBody.read()).length > 0) {}
+    }
   } catch (err) {
     console.log(err);
   }
@@ -103,4 +119,3 @@ const soAccept = (listener: TCPListener): Promise<TCPConn> => {
     console.log(err);
   }
 })();
-

@@ -1,5 +1,7 @@
 import * as net from "net";
 import { DynBuff, cutMessage, bufPush } from "../utils/buffer";
+import { TCPConn, TCPListener } from "../utils/types";
+import { soRead, soWrite } from "../utils/socket";
 
 // initialize socket
 const soInit = (socket: net.Socket) => {
@@ -36,39 +38,6 @@ const soInit = (socket: net.Socket) => {
   });
 
   return Conn;
-};
-
-// read from socket
-const soRead = (Conn: TCPConn): Promise<Buffer> => {
-  return new Promise((resolve, reject) => {
-    if (Conn.err) {
-      return reject(Conn.err);
-    }
-
-    if (Conn.ended) {
-      return resolve(Buffer.from(""));
-    }
-
-    Conn.reader = { resolve, reject };
-    Conn.socket.resume();
-  });
-};
-
-// write to socket
-const soWrite = async (Conn: TCPConn, data: Buffer): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    if (Conn.err) {
-      return reject(Conn.err);
-    }
-
-    Conn.socket.write(data, (err) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve();
-      }
-    });
-  });
 };
 
 const serveClient = async (Conn: TCPConn) => {
@@ -143,17 +112,3 @@ const soAccept = (listener: TCPListener): Promise<TCPConn> => {
     console.log(err);
   }
 })();
-
-type TCPConn = {
-  socket: net.Socket;
-  reader: null | {
-    resolve: (value: Buffer) => void;
-    reject: (value: Error) => void;
-  };
-  err: null | Error;
-  ended: Boolean;
-};
-
-type TCPListener = {
-  server: net.Server;
-};
