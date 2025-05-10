@@ -1,4 +1,5 @@
 import { bufPop, bufPush, DynBuff, splitLines } from "./buffer";
+import { BufferGenerator, countSheep } from "./helpers";
 import { soRead, soWrite } from "./socket";
 import { BodyReader, HTTPReq, HTTPRes, TCPConn } from "./types";
 
@@ -123,6 +124,10 @@ const handleReq = async (req: HTTPReq, body: BodyReader) => {
         break;
       }
     }
+    case "/sheep": {
+      resp = readFromGenerator(countSheep());
+      break;
+    }
     default: {
       resp = readerFromMemory(Buffer.from("BASIC SERVER"));
     }
@@ -153,6 +158,36 @@ const writeHTTPResp = async (conn: TCPConn, resp: HTTPRes) => {
   }
 };
 
+const writeHTTPRespV2 = async (conn: TCPConn, resp: HTTPRes) => {
+  if (resp.body && resp.body.length < 0) {
+    resp.headers.push(Buffer.from("Transfer-Encoding: Chunked"));
+  } else {
+    resp.headers.push(Buffer.from(`Content-Length: ${resp.body?.length || 0}`));
+  }
+
+  await soWrite(conn, encodeHTTPResp(resp));
+
+  const crlf = Buffer.from("\r\n");
+
+  for (let last = false; !last; ) {
+    let data = await resp.body?.read();
+    last = data?.length == 0;
+
+    if (resp.body?.length && resp.body.length < 0) {
+      data = Buffer.concat([
+        Buffer.from(data?.length?.toString(16) || "0"),
+        crlf,
+        data as Buffer,
+        crlf,
+      ]);
+    }
+
+    if (data?.length) {
+      await soWrite(conn, data);
+    }
+  }
+};
+
 const encodeHTTPResp = (resp: HTTPRes) => {
   const heads = [
     Buffer.from(`HTTP/1.1 ${resp.code} Success\r\n`),
@@ -163,4 +198,18 @@ const encodeHTTPResp = (resp: HTTPRes) => {
   return Buffer.concat(heads);
 };
 
-export { readFromReq, parseHTTPReq, handleReq, writeHTTPResp };
+const readFromGenerator = (generator: BufferGenerator) => {
+  return {
+    length: -1,
+    read: async () => {
+      let gen = await generator.next();
+      if (gen.done) {
+        return Buffer.from("");
+      } else {
+        return gen.value;
+      }
+    },
+  };
+};
+
+export { readFromReq, parseHTTPReq, handleReq, writeHTTPResp, writeHTTPRespV2 };
