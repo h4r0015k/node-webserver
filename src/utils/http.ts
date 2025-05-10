@@ -34,10 +34,9 @@ const readFromReq = (conn: TCPConn, buf: DynBuff, req: HTTPReq) => {
   }
 
   const bodyAllowed = !(req.method === "GET" || req.method == "HEAD");
-
   const chunked =
     fieldGet(req.headers, "Transfer-Encoding")?.equals(
-      Buffer.from("chunked")
+      Buffer.from(" chunked")
     ) || false;
 
   if (!bodyAllowed && (chunked || bodyLen > 0)) {
@@ -51,9 +50,36 @@ const readFromReq = (conn: TCPConn, buf: DynBuff, req: HTTPReq) => {
   if (bodyLen >= 0) {
     return readerFromConnLength(conn, buf, bodyLen);
   } else if (chunked) {
-    throw Error("TO DO: chunked");
+    return readFromGenerator(readChunks(conn, buf));
   } else {
     throw Error("TO DO: reading rest of body");
+  }
+};
+
+const readChunks = async function* (
+  conn: TCPConn,
+  buf: DynBuff
+): BufferGenerator {
+  for (let last = false; !last; ) {
+    const idx = buf.data.subarray(0, buf.length).indexOf("\r\n");
+    if (idx < 0) {
+      continue;
+    }
+
+    let remain = buf.data.subarray(0, idx).length;
+    bufPop(buf, remain);
+
+    last = remain == 0;
+
+    while (remain > 0) {
+      const consume = Math.min(remain, buf.length);
+      const data = Buffer.from(buf.data.subarray(0, consume));
+      bufPop(buf, consume);
+      remain -= consume;
+      yield data;
+    }
+
+    bufPop(buf, 2);
   }
 };
 
