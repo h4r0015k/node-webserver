@@ -66,7 +66,11 @@ const serveClient = async (Conn: TCPConn) => {
 
       const reqBody = readFromReq(Conn, buff, message);
       const res: HTTPRes = await handleReq(message, reqBody);
-      await writeHTTPRespV2(Conn, res);
+      try {
+        await writeHTTPRespV2(Conn, res);
+      } finally {
+        await res.body?.close?.();
+      }
 
       // consume req body completly
       while ((await reqBody.read()).length > 0) {}

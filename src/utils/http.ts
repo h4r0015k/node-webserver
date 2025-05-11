@@ -1,4 +1,5 @@
 import { bufPop, bufPush, DynBuff, splitLines } from "./buffer";
+import { serveStaticFile } from "./file";
 import { BufferGenerator, countSheep } from "./helpers";
 import { soRead, soWrite } from "./socket";
 import { BodyReader, HTTPReq, HTTPRes, TCPConn } from "./types";
@@ -139,7 +140,13 @@ const fieldGet = (headers: Array<Buffer>, field: string) => {
 
 const handleReq = async (req: HTTPReq, body: BodyReader) => {
   let resp;
-  switch (req.uri.toString()) {
+  const uri = req.uri.toString();
+
+  if (uri.startsWith("/files/")) {
+    return await serveStaticFile(uri.substring("/files/".length));
+  }
+
+  switch (uri) {
     case "/echo": {
       resp = body;
       break;
@@ -238,4 +245,19 @@ const readFromGenerator = (generator: BufferGenerator) => {
   };
 };
 
-export { readFromReq, parseHTTPReq, handleReq, writeHTTPResp, writeHTTPRespV2 };
+const resp404 = () => {
+  return {
+    headers: [],
+    code: 404,
+    body: readerFromMemory(Buffer.from("Resource not found!")),
+  };
+};
+
+export {
+  readFromReq,
+  parseHTTPReq,
+  handleReq,
+  writeHTTPResp,
+  writeHTTPRespV2,
+  resp404,
+};

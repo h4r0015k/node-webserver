@@ -30,6 +30,7 @@ type HTTPRes = {
 type BodyReader = {
   length: number;
   read: () => Promise<Buffer>;
+  close?: () => Promise<void>;
 };
 
 export { TCPConn, TCPListener, HTTPRes, HTTPReq, BodyReader };
