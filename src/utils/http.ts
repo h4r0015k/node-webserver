@@ -143,7 +143,7 @@ const handleReq = async (req: HTTPReq, body: BodyReader) => {
   const uri = req.uri.toString();
 
   if (uri.startsWith("/files/")) {
-    return await serveStaticFile(uri.substring("/files/".length));
+    return await serveStaticFile(uri.substring("/files/".length), req);
   }
 
   switch (uri) {
@@ -260,4 +260,6 @@ export {
   writeHTTPResp,
   writeHTTPRespV2,
   resp404,
+  fieldGet,
+  readerFromMemory,
 };
