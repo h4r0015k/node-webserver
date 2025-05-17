@@ -7,4 +7,8 @@ const countSheep = async function* (): BufferGenerator {
   }
 };
 
-export { countSheep, BufferGenerator };
+const parseHTTPDate = (date: Buffer) => {
+  return Math.floor(new Date(date.toString().trim()).getTime() / 1000);
+};
+
+export { countSheep, BufferGenerator, parseHTTPDate };

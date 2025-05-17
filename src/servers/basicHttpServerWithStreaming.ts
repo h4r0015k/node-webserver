@@ -71,9 +71,9 @@ const serveClient = async (Conn: TCPConn) => {
       } finally {
         await res.body?.close?.();
       }
-
       // consume req body completly
       while ((await reqBody.read()).length > 0) {}
+      Conn.socket.destroy();
     }
   } catch (err) {
     console.log(err);

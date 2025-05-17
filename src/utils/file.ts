@@ -3,6 +3,8 @@ import { HTTPReq, HTTPRes } from "./types";
 import { fieldGet, readerFromMemory, resp404 } from "./http";
 import { dirname } from "path";
 import { fileURLToPath } from "url";
+import { Stats } from "fs";
+import { parseHTTPDate } from "./helpers";
 
 const serveStaticFile = async (
   path: string,
@@ -14,18 +16,19 @@ const serveStaticFile = async (
       dirname(fileURLToPath(import.meta.url)) + "/" + path,
       "r"
     );
+
     const stat = await fp.stat();
     if (!stat.isFile()) {
       return resp404();
     }
-    const size = stat.size;
 
     try {
-      return staticFileResp(req, fp, size);
+      return staticFileResp(req, fp, stat);
     } finally {
       fp = null;
     }
   } catch (error) {
+    console.log(error);
     return resp404();
   } finally {
     await fp?.close();
@@ -64,8 +67,31 @@ const readerFromStaticFile = (
   };
 };
 
-const staticFileResp = (req: HTTPReq, fp: fs.FileHandle, size: number) => {
-  const range = fieldGet(req.headers, "Range");
+const staticFileResp = (req: HTTPReq, fp: fs.FileHandle, stat: Stats) => {
+  let headers = [
+    Buffer.from("Accept-Ranges: bytes"),
+    Buffer.from(`Last-Modified: ${stat.mtime.toUTCString()}`),
+  ];
+
+  const ts = Math.floor(stat.mtime.getTime() / 1000);
+  const lastModified = fieldGet(req.headers, "If-Modified-Since");
+
+  if (lastModified && ts == parseHTTPDate(lastModified)) {
+    return {
+      code: 304,
+      headers,
+      body: readerFromMemory(Buffer.from("")),
+    };
+  }
+
+  let range = fieldGet(req.headers, "Range");
+  const rangeTime = fieldGet(req.headers, "If-Range");
+
+  if (rangeTime && parseHTTPDate(rangeTime) !== ts) {
+    range = null;
+  }
+
+  const size = stat.size;
   let start = 0;
   let end = size;
   let partial = false;
@@ -107,17 +133,15 @@ const staticFileResp = (req: HTTPReq, fp: fs.FileHandle, size: number) => {
     Number(end || size)
   );
 
+  if (partial) {
+    headers.push(
+      Buffer.from(`Content-Range: bytes ${range?.toString().trim()}/${size}`)
+    );
+  }
+
   return {
     code: partial ? 204 : 200,
-    headers: [
-      Buffer.from(
-        `Accept-Ranges: bytes${
-          partial
-            ? `\r\nContent-Range: bytes ${range?.toString().trim()}/${size}`
-            : ""
-        }`
-      ),
-    ],
+    headers,
     body: reader,
   };
 };

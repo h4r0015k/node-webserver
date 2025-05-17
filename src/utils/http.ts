@@ -129,7 +129,13 @@ const readerFromMemory = (data: Buffer) => {
 const fieldGet = (headers: Array<Buffer>, field: string) => {
   let mappedHeaders: Array<Array<Buffer>> = [];
 
-  headers.forEach((header) => mappedHeaders.push(splitLines(header, ":", 1)));
+  headers.forEach((header) => {
+    let splits = header.toString().split(":");
+    mappedHeaders.push([
+      Buffer.from(splits[0]),
+      Buffer.from(splits.slice(1).join(":")),
+    ]);
+  });
 
   return (
     mappedHeaders.find(
