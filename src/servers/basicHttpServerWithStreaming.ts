@@ -3,6 +3,7 @@ import { DynBuff, bufPush, cutMessageV2 } from "../utils/buffer";
 import { HTTPRes, TCPConn, TCPListener } from "../utils/types";
 import { soRead } from "../utils/socket";
 import { handleReq, readFromReq, writeHTTPRespV2 } from "../utils/http";
+import { enableCompression } from "../utils/compression";
 
 // initialize socket
 const soInit = (socket: net.Socket) => {
@@ -67,6 +68,7 @@ const serveClient = async (Conn: TCPConn) => {
       const reqBody = readFromReq(Conn, buff, message);
       const res: HTTPRes = await handleReq(message, reqBody);
       try {
+        enableCompression(message, res);
         await writeHTTPRespV2(Conn, res);
       } finally {
         await res.body?.close?.();
